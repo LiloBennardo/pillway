@@ -96,24 +96,51 @@ export default function ScanOrdonnance({ onComplete }) {
 
   async function extractTextFromPdf(file) {
     setProgress(10)
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
-
     const arrayBuffer = await file.arrayBuffer()
-    setProgress(30)
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-    let fullText = ''
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const content = await page.getTextContent()
-      const pageText = content.items.map(item => item.str).join(' ')
-      fullText += pageText + '\n'
-      setProgress(30 + Math.round((i / pdf.numPages) * 60))
+    // Try modern build first (desktop), fallback to legacy (Safari mobile)
+    let pdfjsLib
+    try {
+      pdfjsLib = await import('pdfjs-dist')
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+      setProgress(20)
+
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      let fullText = ''
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const content = await page.getTextContent()
+        const pageText = content.items.map(item => item.str).join(' ')
+        fullText += pageText + '\n'
+        setProgress(20 + Math.round((i / pdf.numPages) * 70))
+      }
+      setProgress(100)
+      return fullText
+    } catch (modernErr) {
+      console.warn('Modern pdfjs-dist failed, trying legacy build:', modernErr)
+      setProgress(15)
+
+      try {
+        pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+        pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+        setProgress(20)
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        let fullText = ''
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const content = await page.getTextContent()
+          const pageText = content.items.map(item => item.str).join(' ')
+          fullText += pageText + '\n'
+          setProgress(20 + Math.round((i / pdf.numPages) * 70))
+        }
+        setProgress(100)
+        return fullText
+      } catch (legacyErr) {
+        console.error('Legacy pdfjs-dist also failed:', legacyErr)
+        throw new Error(`PDF non lisible: ${modernErr.message || modernErr}`)
+      }
     }
-
-    setProgress(100)
-    return fullText
   }
 
   function parsePrescriptionText(text) {
