@@ -88,7 +88,7 @@ export default function ScanOrdonnance({ onComplete }) {
       }
     } catch (err) {
       console.error('Scan error:', err)
-      toast.error("Erreur lors de l'analyse")
+      toast.error(`Erreur: ${err.message || err}`, { duration: 8000 })
     }
 
     setScanning(false)
