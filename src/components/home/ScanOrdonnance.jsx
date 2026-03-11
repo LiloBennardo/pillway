@@ -118,107 +118,162 @@ export default function ScanOrdonnance({ onComplete }) {
   }
 
   function parsePrescriptionText(text) {
-    const normalized = text.replace(/\r\n/g, '\n')
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
-    // Split by bullet points first
-    let segments = normalized.split('•').map(s => s.trim()).filter(Boolean)
+    // Split by various delimiters: bullets, numbered lists, newlines
+    let segments = normalized
+      .split(/(?:^|\n)\s*(?:•|–|—|-|\d+[.)]\s*)/m)
+      .map(s => s.trim())
+      .filter(Boolean)
 
-    // If only one segment, try newlines
+    // If only one big segment, split by newlines
     if (segments.length <= 1) {
-      segments = normalized.split('\n').map(s => s.trim()).filter(Boolean)
+      segments = normalized.split('\n').map(s => s.trim()).filter(s => s.length > 3)
     }
+
+    // Known medication names to boost detection
+    const KNOWN_MEDS = [
+      'doliprane', 'paracetamol', 'paracétamol', 'efferalgan', 'dafalgan',
+      'ibuprofene', 'ibuprofène', 'advil', 'nurofen',
+      'amoxicilline', 'augmentin', 'clamoxyl',
+      'omeprazole', 'oméprazole', 'inexium', 'gaviscon',
+      'metformine', 'glucophage', 'diamicron',
+      'levothyrox', 'levothyroxine', 'euthyrox',
+      'ramipril', 'triatec', 'amlodipine', 'amlor',
+      'atorvastatine', 'tahor', 'crestor', 'rosuvastatine',
+      'bisoprolol', 'cardensiel',
+      'sertraline', 'zoloft', 'escitalopram', 'seroplex', 'lexapro',
+      'alprazolam', 'xanax', 'lexomil', 'bromazepam',
+      'ventoline', 'salbutamol', 'seretide', 'symbicort',
+      'kardegic', 'aspirine', 'aspégic', 'aspegic',
+      'spasfon', 'phloroglucinol',
+      'tramadol', 'codeine', 'codéine', 'lamaline',
+      'voltarene', 'voltarène', 'diclofenac', 'diclofénac',
+      'prednisolone', 'prednisone', 'solupred', 'cortancyl',
+      'methotrexate', 'méthotrexate',
+      'levocetirizine', 'lévocétirizine', 'xyzall', 'aerius', 'desloratadine',
+      'furosemide', 'furosémide', 'lasilix',
+      'lovenox', 'enoxaparine', 'xarelto', 'rivaroxaban',
+      'lyrica', 'pregabaline', 'prégabaline', 'gabapentine',
+      'daflon', 'diosmine',
+      'smecta', 'tiorfan', 'imodium', 'loperamide', 'lopéramide',
+      'mopral', 'lansoprazole', 'pantoprazole',
+      'fluoxetine', 'fluoxétine', 'prozac', 'deroxat', 'paroxetine', 'paroxétine',
+      'zopiclone', 'imovane', 'stilnox', 'zolpidem',
+      'cetirizine', 'cétirizine', 'zyrtec',
+      'clopidogrel', 'plavix',
+      'metoprolol', 'métoprolol', 'seloken',
+    ]
 
     const results = []
 
     for (const segment of segments) {
       const lower = segment.toLowerCase()
 
-      // === STRICT FILTERING ===
-
-      // 1. Skip if contains any noise term (doctor info, admin, addresses...)
+      // Skip noise (doctor info, addresses, admin...)
       if (NOISE_TERMS.some(term => lower.includes(term))) continue
 
-      // 2. MUST have a pharmaceutical dosage pattern
+      // Skip very short or very long segments
+      if (segment.length < 5 || segment.length > 300) continue
+
+      // === DETECTION: at least one of these criteria ===
       const hasDosage = /\d+[,.]?\d*\s*(?:mg|ml|g|µg|ui|%)/i.test(segment)
-      if (!hasDosage) continue
+      const hasPharmForm = /\b(cp|comprimé|comprime|gélule|gelule|crème|creme|sirop|solution|pulv|spray|injection|patch|goutte|collyre|pommade|tube|sachet|ampoule|suppositoire|gtt|caps|tab)\b/i.test(segment)
+      const hasKnownMed = KNOWN_MEDS.some(m => lower.includes(m))
+      const hasPosology = /\b(\d+\s*(fois|x|cp|comp|gel)\s*par\s*jour|\d+\s*(?:matin|midi|soir|coucher)|par\s*jour|avant|après|pendant\s*\d+|si\s*besoin)\b/i.test(segment)
 
-      // 3. MUST have a colon separating prescription from posology
-      if (!segment.includes(':')) continue
-
-      // 4. Should have a brand name in parentheses OR a known pharmaceutical form
-      const hasBrand = /\([A-ZÀ-Ÿ][A-ZÀ-Ÿ\s\-]{2,}\)/.test(segment)
-      const hasPharmForm = /\b(cp|comprimé|gélule|gelule|crème|creme|sirop|solution|pulv|spray|injection|patch|goutte|collyre|pommade|tube|sachet|ampoule|suppositoire)\b/i.test(segment)
-      if (!hasBrand && !hasPharmForm) continue
+      // Must match at least one pharma indicator
+      if (!hasDosage && !hasPharmForm && !hasKnownMed && !hasPosology) continue
 
       // === PARSING ===
 
-      const parts = segment.split(':')
-      const prescriptionPart = parts[0] || ''
-      const posologyPart = parts.slice(1).join(':') || ''
-
-      // Extract brand name: last parenthetical in prescription part
-      const parentheticals = [...prescriptionPart.matchAll(/\(([^)]+)\)/g)]
-      let brandName = ''
-      if (parentheticals.length > 0) {
-        brandName = parentheticals[parentheticals.length - 1][1].trim()
+      // Split on colon if present, otherwise use the whole segment
+      let prescriptionPart, posologyPart
+      if (segment.includes(':')) {
+        const parts = segment.split(':')
+        prescriptionPart = parts[0] || ''
+        posologyPart = parts.slice(1).join(':') || ''
+      } else {
+        prescriptionPart = segment
+        posologyPart = segment
       }
 
-      // Extract dosage - specific units first, then 'g', then '%'
+      const fullText = prescriptionPart + ' ' + posologyPart
+
+      // Extract dosage
       let dosage = ''
       const dosageMatch =
-        prescriptionPart.match(/(\d+[,.]?\d*\s*(?:mg|ml|µg|ui))/i) ||
-        prescriptionPart.match(/(\d+[,.]?\d*\s*g)\b/i) ||
-        prescriptionPart.match(/(\d+[,.]?\d*\s*%)/i)
+        fullText.match(/(\d+[,.]?\d*\s*(?:mg|ml|µg|ui))/i) ||
+        fullText.match(/(\d+[,.]?\d*\s*g)\b/i) ||
+        fullText.match(/(\d+[,.]?\d*\s*%)/i)
       if (dosageMatch) {
         dosage = dosageMatch[1].trim()
       }
 
       // Detect pharmaceutical form
       let form = 'comprimé'
-      const formText = (prescriptionPart + ' ' + posologyPart).toLowerCase()
+      const formText = fullText.toLowerCase()
       if (/crème|creme|pommade|tube/.test(formText)) form = 'crème'
-      else if (/gélule|gelule/.test(formText)) form = 'gélule'
-      else if (/pulv|spray|nasal/.test(formText)) form = 'spray nasal'
+      else if (/gélule|gelule|caps/.test(formText)) form = 'gélule'
+      else if (/pulv|spray|nasal/.test(formText)) form = 'spray'
       else if (/sirop|solution buvable|buvable/.test(formText)) form = 'sirop'
       else if (/injection|inject/.test(formText)) form = 'injection'
       else if (/patch/.test(formText)) form = 'patch'
-      else if (/goutte|collyre/.test(formText)) form = 'gouttes'
+      else if (/goutte|collyre|gtt/.test(formText)) form = 'gouttes'
       else if (/suppositoire/.test(formText)) form = 'suppositoire'
       else if (/sachet/.test(formText)) form = 'sachet'
-      else if (/cp\b|comprimé/.test(formText)) form = 'comprimé'
 
       // === FREQUENCY ===
       let timesPerDay = 1
-      const freqMatch = posologyPart.match(/(\d+)\s*fois\s*par\s*jour/i)
+      const freqMatch = fullText.match(/(\d+)\s*(?:fois\s*par\s*jour|x\s*\/?\s*j(?:our)?)/i)
       if (freqMatch) {
         timesPerDay = Math.min(parseInt(freqMatch[1]), 4)
-      } else {
-        // "1 cp 4 fois" or "4x/jour"
-        const altFreq = posologyPart.match(/(\d+)\s*(?:x|fois)/i)
-        if (altFreq) {
-          const n = parseInt(altFreq[1])
-          if (n >= 2 && n <= 4) timesPerDay = n
-        }
+      } else if (/matin.*soir|soir.*matin/i.test(fullText)) {
+        timesPerDay = 2
+      } else if (/matin.*midi.*soir/i.test(fullText)) {
+        timesPerDay = 3
       }
       const times = [...(TIME_PRESETS[timesPerDay] || ['08:00'])]
 
       // === DURATION ===
-      let duration = null // number of days, null = continuous
-      const durationMatch = posologyPart.match(/pendant\s+(\d+)\s*jours?/i)
+      let duration = null
+      const durationMatch = fullText.match(/pendant\s+(\d+)\s*jours?/i) ||
+        fullText.match(/(\d+)\s*jours?/i)
       if (durationMatch) {
-        duration = parseInt(durationMatch[1])
+        const d = parseInt(durationMatch[1])
+        if (d >= 2 && d <= 365) duration = d
       }
 
       // === AS NEEDED ===
-      const asNeeded = /si\s+besoin/i.test(posologyPart)
+      const asNeeded = /si\s*(besoin|nécessaire|douleur)/i.test(fullText)
 
       // === NAME ===
-      let name = brandName
+      // Try known medication name first
+      let name = ''
+      for (const med of KNOWN_MEDS) {
+        if (lower.includes(med)) {
+          name = med.charAt(0).toUpperCase() + med.slice(1)
+          break
+        }
+      }
+
+      // Try brand name in parentheses
+      if (!name) {
+        const parentheticals = [...prescriptionPart.matchAll(/\(([^)]+)\)/g)]
+        if (parentheticals.length > 0) {
+          const candidate = parentheticals[parentheticals.length - 1][1].trim()
+          if (candidate.length >= 3 && !/^\d/.test(candidate)) {
+            name = candidate
+          }
+        }
+      }
+
+      // Fallback: extract first meaningful word(s)
       if (!name) {
         const cleaned = prescriptionPart
           .replace(/\(.*?\)/g, '')
           .replace(/\d+[,.]?\d*\s*(?:mg|ml|g|µg|ui|%)/gi, '')
-          .replace(/\b(SOL|CP|GEL|INJ|PULV|NASAL|P|CREME|CRÈME|COMPRIME|GELULE|GÉLULE)\b/gi, '')
+          .replace(/\b(SOL|CP|GEL|INJ|PULV|NASAL|CREME|CRÈME|COMPRIME|GELULE|GÉLULE|QSP|NR)\b/gi, '')
           .replace(/[^a-zA-ZÀ-ÿ\s\-]/g, '')
           .trim()
         const words = cleaned.split(/\s+/).filter(w => w.length >= 3)
