@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Camera, Upload, Loader2, Check, Clock, FileText, Plus, Minus, AlertTriangle, Calendar } from 'lucide-react'
+import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { addDays, format } from 'date-fns'
@@ -97,7 +98,7 @@ export default function ScanOrdonnance({ onComplete }) {
   async function extractTextFromPdf(file) {
     setProgress(10)
     const pdfjsLib = await import('pdfjs-dist')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl
 
     const arrayBuffer = await file.arrayBuffer()
     setProgress(30)
