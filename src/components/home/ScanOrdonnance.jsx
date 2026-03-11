@@ -151,191 +151,185 @@ export default function ScanOrdonnance({ onComplete }) {
     }
   }
 
+  // Known medication names database
+  const KNOWN_MEDS = [
+    'doliprane', 'paracetamol', 'paracétamol', 'efferalgan', 'dafalgan',
+    'ibuprofene', 'ibuprofène', 'advil', 'nurofen',
+    'amoxicilline', 'augmentin', 'clamoxyl',
+    'omeprazole', 'oméprazole', 'inexium', 'gaviscon',
+    'metformine', 'glucophage', 'diamicron',
+    'levothyrox', 'levothyroxine', 'euthyrox',
+    'ramipril', 'triatec', 'amlodipine', 'amlor',
+    'atorvastatine', 'tahor', 'crestor', 'rosuvastatine',
+    'bisoprolol', 'cardensiel',
+    'sertraline', 'zoloft', 'escitalopram', 'seroplex', 'lexapro',
+    'alprazolam', 'xanax', 'lexomil', 'bromazepam',
+    'ventoline', 'salbutamol', 'seretide', 'symbicort',
+    'kardegic', 'aspirine', 'aspégic', 'aspegic',
+    'spasfon', 'phloroglucinol',
+    'tramadol', 'codeine', 'codéine', 'lamaline',
+    'voltarene', 'voltarène', 'diclofenac', 'diclofénac',
+    'prednisolone', 'prednisone', 'solupred', 'cortancyl',
+    'methotrexate', 'méthotrexate',
+    'levocetirizine', 'lévocétirizine', 'xyzall', 'aerius', 'desloratadine',
+    'furosemide', 'furosémide', 'lasilix',
+    'lovenox', 'enoxaparine', 'xarelto', 'rivaroxaban',
+    'lyrica', 'pregabaline', 'prégabaline', 'gabapentine',
+    'daflon', 'diosmine',
+    'smecta', 'tiorfan', 'imodium', 'loperamide', 'lopéramide',
+    'mopral', 'lansoprazole', 'pantoprazole',
+    'fluoxetine', 'fluoxétine', 'prozac', 'deroxat', 'paroxetine', 'paroxétine',
+    'zopiclone', 'imovane', 'stilnox', 'zolpidem',
+    'cetirizine', 'cétirizine', 'zyrtec',
+    'clopidogrel', 'plavix',
+    'metoprolol', 'métoprolol', 'seloken',
+    'aturgyl', 'rhinofluimucil', 'pivalone', 'nasonex',
+    'amoxicilline', 'ciprofloxacine', 'azithromycine', 'zithromax',
+    'inexium', 'esomeprazole', 'ésoméprazole',
+    'donormyl', 'doxylamine', 'melatonine', 'mélatonine',
+    'toplexil', 'oxomemazine', 'oxomémazine',
+    'maxilase', 'alpha-amylase',
+    'biafine', 'flammazine',
+    'ixprim', 'izalgi',
+    'tahor', 'ezetimibe', 'ézétimibe',
+    'triatec', 'coversyl', 'perindopril', 'périndopril',
+    'previscan', 'fluindione', 'coumadine', 'warfarine',
+    'lévothyrox', 'euthyral',
+    'speciafoldine', 'acide folique',
+    'uvedose', 'vitamine d', 'cholecalciferol', 'cholécalciférol',
+  ]
+
+  function detectForm(text) {
+    const t = text.toLowerCase()
+    if (/crème|creme|pommade|tube/.test(t)) return 'crème'
+    if (/gélule|gelule|caps/.test(t)) return 'gélule'
+    if (/pulv|spray|nasal/.test(t)) return 'spray'
+    if (/sirop|solution buvable|buvable/.test(t)) return 'sirop'
+    if (/injection|inject/.test(t)) return 'injection'
+    if (/patch/.test(t)) return 'patch'
+    if (/goutte|collyre|gtt/.test(t)) return 'gouttes'
+    if (/suppositoire/.test(t)) return 'suppositoire'
+    if (/sachet/.test(t)) return 'sachet'
+    return 'comprimé'
+  }
+
+  function extractMedDetails(context) {
+    // Extract dosage
+    let dosage = ''
+    const dosageMatch =
+      context.match(/(\d+[,.]?\d*\s*(?:mg|ml|µg|ui))/i) ||
+      context.match(/(\d+[,.]?\d*\s*g)\b/i) ||
+      context.match(/(\d+[,.]?\d*\s*%)/i)
+    if (dosageMatch) dosage = dosageMatch[1].trim()
+
+    // Frequency
+    let timesPerDay = 1
+    const freqMatch = context.match(/(\d+)\s*(?:fois\s*par\s*jour|x\s*\/?\s*j(?:our)?)/i)
+    if (freqMatch) {
+      timesPerDay = Math.min(parseInt(freqMatch[1]), 4)
+    } else if (/matin.*soir|soir.*matin/i.test(context)) {
+      timesPerDay = 2
+    } else if (/matin.*midi.*soir/i.test(context)) {
+      timesPerDay = 3
+    }
+    const times = [...(TIME_PRESETS[timesPerDay] || ['08:00'])]
+
+    // Duration
+    let duration = null
+    const durationMatch = context.match(/pendant\s+(\d+)\s*jours?/i) ||
+      context.match(/(\d+)\s*jours?\s*(?:de\s*traitement)?/i)
+    if (durationMatch) {
+      const d = parseInt(durationMatch[1])
+      if (d >= 2 && d <= 365) duration = d
+    }
+
+    // As needed
+    const asNeeded = /si\s*(besoin|nécessaire|douleur)/i.test(context)
+
+    // Posology
+    let posology = ''
+    const posoMatch = context.match(/(\d+\s*(?:fois|x|cp|comp|gel|gél).*?(?:jour|matin|soir|midi|coucher|semaine)[^\n]{0,40})/i)
+    if (posoMatch) posology = posoMatch[1].trim()
+
+    return { dosage, form: detectForm(context), times, duration, asNeeded, posology }
+  }
+
   function parsePrescriptionText(text) {
-    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-
-    // Split by various delimiters: bullets, numbered lists, newlines
-    let segments = normalized
-      .split(/(?:^|\n)\s*(?:•|–|—|-|\d+[.)]\s*)/m)
-      .map(s => s.trim())
-      .filter(Boolean)
-
-    // If only one big segment, split by newlines
-    if (segments.length <= 1) {
-      segments = normalized.split('\n').map(s => s.trim()).filter(s => s.length > 3)
-    }
-
-    // Known medication names to boost detection
-    const KNOWN_MEDS = [
-      'doliprane', 'paracetamol', 'paracétamol', 'efferalgan', 'dafalgan',
-      'ibuprofene', 'ibuprofène', 'advil', 'nurofen',
-      'amoxicilline', 'augmentin', 'clamoxyl',
-      'omeprazole', 'oméprazole', 'inexium', 'gaviscon',
-      'metformine', 'glucophage', 'diamicron',
-      'levothyrox', 'levothyroxine', 'euthyrox',
-      'ramipril', 'triatec', 'amlodipine', 'amlor',
-      'atorvastatine', 'tahor', 'crestor', 'rosuvastatine',
-      'bisoprolol', 'cardensiel',
-      'sertraline', 'zoloft', 'escitalopram', 'seroplex', 'lexapro',
-      'alprazolam', 'xanax', 'lexomil', 'bromazepam',
-      'ventoline', 'salbutamol', 'seretide', 'symbicort',
-      'kardegic', 'aspirine', 'aspégic', 'aspegic',
-      'spasfon', 'phloroglucinol',
-      'tramadol', 'codeine', 'codéine', 'lamaline',
-      'voltarene', 'voltarène', 'diclofenac', 'diclofénac',
-      'prednisolone', 'prednisone', 'solupred', 'cortancyl',
-      'methotrexate', 'méthotrexate',
-      'levocetirizine', 'lévocétirizine', 'xyzall', 'aerius', 'desloratadine',
-      'furosemide', 'furosémide', 'lasilix',
-      'lovenox', 'enoxaparine', 'xarelto', 'rivaroxaban',
-      'lyrica', 'pregabaline', 'prégabaline', 'gabapentine',
-      'daflon', 'diosmine',
-      'smecta', 'tiorfan', 'imodium', 'loperamide', 'lopéramide',
-      'mopral', 'lansoprazole', 'pantoprazole',
-      'fluoxetine', 'fluoxétine', 'prozac', 'deroxat', 'paroxetine', 'paroxétine',
-      'zopiclone', 'imovane', 'stilnox', 'zolpidem',
-      'cetirizine', 'cétirizine', 'zyrtec',
-      'clopidogrel', 'plavix',
-      'metoprolol', 'métoprolol', 'seloken',
-    ]
-
+    const fullText = text.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ')
+    const lower = fullText.toLowerCase()
     const results = []
+    const foundNames = new Set()
 
-    for (const segment of segments) {
-      const lower = segment.toLowerCase()
+    // === PASS 1: Scan entire text for known medication names ===
+    for (const med of KNOWN_MEDS) {
+      const idx = lower.indexOf(med)
+      if (idx === -1) continue
+      if (foundNames.has(med)) continue
 
-      // Skip noise (doctor info, addresses, admin...)
-      if (NOISE_TERMS.some(term => lower.includes(term))) continue
+      // Extract context around the match (200 chars around)
+      const contextStart = Math.max(0, idx - 60)
+      const contextEnd = Math.min(fullText.length, idx + med.length + 140)
+      const context = fullText.substring(contextStart, contextEnd)
 
-      // Skip very short or very long segments
-      if (segment.length < 5 || segment.length > 300) continue
+      const details = extractMedDetails(context)
 
-      // === DETECTION: at least one of these criteria ===
-      const hasDosage = /\d+[,.]?\d*\s*(?:mg|ml|g|µg|ui|%)/i.test(segment)
-      const hasPharmForm = /\b(cp|comprimé|comprime|gélule|gelule|crème|creme|sirop|solution|pulv|spray|injection|patch|goutte|collyre|pommade|tube|sachet|ampoule|suppositoire|gtt|caps|tab)\b/i.test(segment)
-      const hasKnownMed = KNOWN_MEDS.some(m => lower.includes(m))
-      const hasPosology = /\b(\d+\s*(fois|x|cp|comp|gel)\s*par\s*jour|\d+\s*(?:matin|midi|soir|coucher)|par\s*jour|avant|après|pendant\s*\d+|si\s*besoin)\b/i.test(segment)
+      const name = med.charAt(0).toUpperCase() + med.slice(1).toLowerCase()
+      foundNames.add(med)
 
-      // Must match at least one pharma indicator
-      if (!hasDosage && !hasPharmForm && !hasKnownMed && !hasPosology) continue
+      // Skip if a variant of this med is already found (e.g. paracetamol + doliprane)
+      const ALIASES = [
+        ['doliprane', 'paracetamol', 'paracétamol', 'efferalgan', 'dafalgan'],
+        ['ibuprofene', 'ibuprofène', 'advil', 'nurofen'],
+        ['omeprazole', 'oméprazole', 'mopral', 'inexium', 'esomeprazole', 'ésoméprazole'],
+        ['levothyrox', 'lévothyrox', 'levothyroxine', 'euthyrox', 'euthyral'],
+        ['cetirizine', 'cétirizine', 'zyrtec', 'levocetirizine', 'lévocétirizine', 'xyzall'],
+        ['metformine', 'glucophage'],
+        ['atorvastatine', 'tahor'],
+        ['sertraline', 'zoloft'],
+        ['escitalopram', 'seroplex'],
+        ['alprazolam', 'xanax'],
+        ['ventoline', 'salbutamol'],
+        ['tramadol', 'ixprim', 'izalgi'],
+      ]
+      const aliasGroup = ALIASES.find(g => g.includes(med))
+      if (aliasGroup && aliasGroup.some(a => a !== med && foundNames.has(a))) continue
 
-      // === PARSING ===
-
-      // Split on colon if present, otherwise use the whole segment
-      let prescriptionPart, posologyPart
-      if (segment.includes(':')) {
-        const parts = segment.split(':')
-        prescriptionPart = parts[0] || ''
-        posologyPart = parts.slice(1).join(':') || ''
-      } else {
-        prescriptionPart = segment
-        posologyPart = segment
-      }
-
-      const fullText = prescriptionPart + ' ' + posologyPart
-
-      // Extract dosage
-      let dosage = ''
-      const dosageMatch =
-        fullText.match(/(\d+[,.]?\d*\s*(?:mg|ml|µg|ui))/i) ||
-        fullText.match(/(\d+[,.]?\d*\s*g)\b/i) ||
-        fullText.match(/(\d+[,.]?\d*\s*%)/i)
-      if (dosageMatch) {
-        dosage = dosageMatch[1].trim()
-      }
-
-      // Detect pharmaceutical form
-      let form = 'comprimé'
-      const formText = fullText.toLowerCase()
-      if (/crème|creme|pommade|tube/.test(formText)) form = 'crème'
-      else if (/gélule|gelule|caps/.test(formText)) form = 'gélule'
-      else if (/pulv|spray|nasal/.test(formText)) form = 'spray'
-      else if (/sirop|solution buvable|buvable/.test(formText)) form = 'sirop'
-      else if (/injection|inject/.test(formText)) form = 'injection'
-      else if (/patch/.test(formText)) form = 'patch'
-      else if (/goutte|collyre|gtt/.test(formText)) form = 'gouttes'
-      else if (/suppositoire/.test(formText)) form = 'suppositoire'
-      else if (/sachet/.test(formText)) form = 'sachet'
-
-      // === FREQUENCY ===
-      let timesPerDay = 1
-      const freqMatch = fullText.match(/(\d+)\s*(?:fois\s*par\s*jour|x\s*\/?\s*j(?:our)?)/i)
-      if (freqMatch) {
-        timesPerDay = Math.min(parseInt(freqMatch[1]), 4)
-      } else if (/matin.*soir|soir.*matin/i.test(fullText)) {
-        timesPerDay = 2
-      } else if (/matin.*midi.*soir/i.test(fullText)) {
-        timesPerDay = 3
-      }
-      const times = [...(TIME_PRESETS[timesPerDay] || ['08:00'])]
-
-      // === DURATION ===
-      let duration = null
-      const durationMatch = fullText.match(/pendant\s+(\d+)\s*jours?/i) ||
-        fullText.match(/(\d+)\s*jours?/i)
-      if (durationMatch) {
-        const d = parseInt(durationMatch[1])
-        if (d >= 2 && d <= 365) duration = d
-      }
-
-      // === AS NEEDED ===
-      const asNeeded = /si\s*(besoin|nécessaire|douleur)/i.test(fullText)
-
-      // === NAME ===
-      // Try known medication name first
-      let name = ''
-      for (const med of KNOWN_MEDS) {
-        if (lower.includes(med)) {
-          name = med.charAt(0).toUpperCase() + med.slice(1)
-          break
-        }
-      }
-
-      // Try brand name in parentheses
-      if (!name) {
-        const parentheticals = [...prescriptionPart.matchAll(/\(([^)]+)\)/g)]
-        if (parentheticals.length > 0) {
-          const candidate = parentheticals[parentheticals.length - 1][1].trim()
-          if (candidate.length >= 3 && !/^\d/.test(candidate)) {
-            name = candidate
-          }
-        }
-      }
-
-      // Fallback: extract first meaningful word(s)
-      if (!name) {
-        const cleaned = prescriptionPart
-          .replace(/\(.*?\)/g, '')
-          .replace(/\d+[,.]?\d*\s*(?:mg|ml|g|µg|ui|%)/gi, '')
-          .replace(/\b(SOL|CP|GEL|INJ|PULV|NASAL|CREME|CRÈME|COMPRIME|GELULE|GÉLULE|QSP|NR)\b/gi, '')
-          .replace(/[^a-zA-ZÀ-ÿ\s\-]/g, '')
-          .trim()
-        const words = cleaned.split(/\s+/).filter(w => w.length >= 3)
-        name = words.slice(0, 2).join(' ')
-      }
-
-      if (!name || name.length < 3) continue
-
-      // Proper capitalization
-      name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
-
-      results.push({
-        name,
-        dosage,
-        form,
-        times,
-        posology: posologyPart.trim(),
-        duration,
-        asNeeded,
-      })
+      results.push({ name, ...details })
     }
 
-    // Deduplicate by name
-    const unique = results.filter((med, i, arr) =>
-      arr.findIndex(m => m.name.toLowerCase() === med.name.toLowerCase()) === i
-    )
+    // === PASS 2: Find medications by dosage patterns (for unknown meds) ===
+    const dosageRegex = /([A-ZÀ-ÿ][a-zA-ZÀ-ÿ\-]{2,}(?:\s+[A-ZÀ-ÿ][a-zA-ZÀ-ÿ\-]+)?)\s+(\d+[,.]?\d*\s*(?:mg|ml|µg|ui|g)\b)/gi
+    let match
+    while ((match = dosageRegex.exec(fullText)) !== null) {
+      let candidateName = match[1].trim()
+      const candidateDosage = match[2].trim()
 
-    return unique.slice(0, 10)
+      // Skip if name is a noise word
+      const candidateLower = candidateName.toLowerCase()
+      const isNoise = NOISE_TERMS.some(term => candidateLower.includes(term)) ||
+        /^(no|le|la|les|un|une|des|du|au|ce|cette|son|sa|en|pour|par|avec|dans|sur|que|qui|dont)$/i.test(candidateName)
+      if (isNoise) continue
+
+      // Skip if already found
+      if (foundNames.has(candidateLower)) continue
+      if (results.some(r => r.name.toLowerCase() === candidateLower)) continue
+
+      // Get context
+      const idx = match.index
+      const contextStart = Math.max(0, idx - 30)
+      const contextEnd = Math.min(fullText.length, idx + match[0].length + 120)
+      const context = fullText.substring(contextStart, contextEnd)
+
+      const details = extractMedDetails(context)
+      details.dosage = candidateDosage
+
+      candidateName = candidateName.charAt(0).toUpperCase() + candidateName.slice(1).toLowerCase()
+      foundNames.add(candidateLower)
+
+      results.push({ name: candidateName, ...details })
+    }
+
+    return results.slice(0, 10)
   }
 
   function toggleMed(index) {
