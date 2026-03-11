@@ -73,6 +73,14 @@ export default function ScanOrdonnance({ onComplete }) {
       }
 
       console.log('Texte extrait:', text)
+      // Debug: show extracted text info
+      if (!text || text.trim().length === 0) {
+        toast.error('Le PDF ne contient pas de texte extractible. Essayez de le scanner en tant qu\'image.', { duration: 8000 })
+        setScanning(false)
+        return
+      }
+      toast(`Texte extrait (${text.trim().length} car.): "${text.trim().substring(0, 120)}..."`, { duration: 12000, icon: '🔍' })
+
       const meds = parsePrescriptionText(text)
 
       if (meds.length === 0) {
