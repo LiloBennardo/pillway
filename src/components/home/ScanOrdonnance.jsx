@@ -97,8 +97,7 @@ export default function ScanOrdonnance({ onComplete }) {
   async function extractTextFromPdf(file) {
     setProgress(10)
     const pdfjsLib = await import('pdfjs-dist')
-    const workerModule = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
     const arrayBuffer = await file.arrayBuffer()
     setProgress(30)
