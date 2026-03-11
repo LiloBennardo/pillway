@@ -84,7 +84,7 @@ export default function MedicationsPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary pb-24">
-      <div className="px-4 pt-6 max-w-lg mx-auto">
+      <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-white font-display font-bold text-2xl">Médicaments & Notices</h1>
           <button

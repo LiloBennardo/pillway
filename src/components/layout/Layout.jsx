@@ -14,7 +14,7 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-h-screen">
         <Navbar />
         <main
-          className="flex-1 overflow-y-auto scroll-smooth"
+          className="flex-1 overflow-y-auto scroll-smooth md:pb-6"
           style={{ paddingBottom: 'calc(72px + env(safe-area-inset-bottom) + 8px)' }}
         >
           <Outlet />

@@ -57,7 +57,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-bg-primary pb-24">
-      <div className="px-4 pt-6 max-w-lg mx-auto">
+      <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl mx-auto">
         <h1 className="text-white font-display font-bold text-2xl mb-6">Mon profil</h1>
 
         {/* Avatar */}

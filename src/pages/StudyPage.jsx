@@ -21,7 +21,7 @@ export default function StudyPage() {
 
     return (
       <div className="min-h-screen bg-bg-primary pb-24">
-        <div className="px-4 pt-6 max-w-lg mx-auto">
+        <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
           <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition">
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Retour</span>
@@ -98,7 +98,7 @@ export default function StudyPage() {
   if (activeView === 'naturalVsPharma') {
     return (
       <div className="min-h-screen bg-bg-primary pb-24">
-        <div className="px-4 pt-6 max-w-lg mx-auto">
+        <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
           <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition">
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Retour</span>
@@ -126,7 +126,7 @@ export default function StudyPage() {
   // Main menu
   return (
     <div className="min-h-screen bg-bg-primary pb-24">
-      <div className="px-4 pt-6 max-w-lg mx-auto">
+      <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-purple-400" />

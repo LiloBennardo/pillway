@@ -169,7 +169,7 @@ export default function ReportPage() {
   const monthName = format(new Date(year, month - 1), 'MMMM yyyy', { locale: fr })
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-28 px-4 pt-6 max-w-lg mx-auto">
+    <div className="min-h-screen bg-bg-primary pb-28 px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

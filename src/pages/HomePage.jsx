@@ -78,7 +78,7 @@ export default function HomePage() {
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      <div className="px-4 pt-6 max-w-lg mx-auto">
+      <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto">
 
         {/* Pull-to-refresh indicator */}
         {pullDistance > 10 && (
@@ -92,7 +92,7 @@ export default function HomePage() {
         {/* Greeting */}
         <div className="mb-5">
           <p className="text-gray-400 text-sm">{greeting} 👋</p>
-          <h1 className="text-white font-display font-bold text-2xl">
+          <h1 className="text-white font-display font-bold text-2xl lg:text-3xl">
             {profile?.full_name?.split(' ')[0] || 'Bienvenue'}
           </h1>
         </div>
@@ -109,43 +109,52 @@ export default function HomePage() {
         {/* Interaction alerts */}
         <InteractionAlert />
 
-        {/* Streak */}
-        <StreakWidget />
-
-        {/* Hero — Next medication */}
-        <NextMedCard
-          log={nextMed}
-          onTake={(id, status) => updateLogStatus(id || nextMed?.id, status || 'taken')}
-          onSnooze={snoozeLog}
-        />
-
-        {/* Scan ordonnance */}
-        <ScanOrdonnance onComplete={refetch} />
-
-        {/* Monthly report link */}
-        <Link
-          to="/rapport"
-          className="flex items-center justify-between bg-brand-green text-white rounded-2xl px-5 py-4 mb-4 shadow-green hover:bg-brand-green-dark transition"
-        >
+        {/* Desktop 2-column grid */}
+        <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+          {/* Left column */}
           <div>
-            <p className="font-bold text-sm">Rapport mensuel</p>
-            <p className="text-xs text-green-100 mt-0.5">Envoyez le suivi à votre médecin</p>
+            {/* Streak */}
+            <StreakWidget />
+
+            {/* Hero — Next medication */}
+            <NextMedCard
+              log={nextMed}
+              onTake={(id, status) => updateLogStatus(id || nextMed?.id, status || 'taken')}
+              onSnooze={snoozeLog}
+            />
+
+            {/* Scan ordonnance */}
+            <ScanOrdonnance onComplete={refetch} />
+
+            {/* Monthly report link */}
+            <Link
+              to="/rapport"
+              className="flex items-center justify-between bg-brand-green text-white rounded-2xl px-5 py-4 mb-4 shadow-green hover:bg-brand-green-dark transition"
+            >
+              <div>
+                <p className="font-bold text-sm">Rapport mensuel</p>
+                <p className="text-xs text-green-100 mt-0.5">Envoyez le suivi à votre médecin</p>
+              </div>
+              <FileText className="w-5 h-5 opacity-80" />
+            </Link>
+
+            {/* Collapsible Reminders */}
+            <CollapsibleReminders
+              logs={logs}
+              loading={loading}
+              onStatusChange={updateLogStatus}
+            />
           </div>
-          <FileText className="w-5 h-5 opacity-80" />
-        </Link>
 
-        {/* Collapsible Reminders — replaces old TodayTimeline */}
-        <CollapsibleReminders
-          logs={logs}
-          loading={loading}
-          onStatusChange={updateLogStatus}
-        />
+          {/* Right column */}
+          <div>
+            {/* Mini Calendar */}
+            <MiniCalendar logs={monthLogs} />
 
-        {/* Mini Calendar — compact by default, expandable */}
-        <MiniCalendar logs={monthLogs} />
-
-        {/* Quick Stats */}
-        <QuickStats logs={logs} />
+            {/* Quick Stats */}
+            <QuickStats logs={logs} />
+          </div>
+        </div>
 
       </div>
     </div>

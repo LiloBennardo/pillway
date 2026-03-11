@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-bg-primary pb-24">
-      <div className="px-4 pt-6 max-w-lg mx-auto text-center">
+      <div className="px-4 md:px-6 pt-6 max-w-lg md:max-w-2xl mx-auto text-center">
         <div className="bg-brand-green/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 className="w-8 h-8 text-brand-green" />
         </div>
